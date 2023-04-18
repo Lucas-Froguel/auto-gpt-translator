@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+import argparse
 import openai
 import tiktoken
 from termcolor import cprint
@@ -23,7 +24,7 @@ with open("auto-translator-prompt.txt") as f:
 
 class AutoTranslator:
     def __init__(
-        self, file_path = None, model = None, system_prompt = None, max_tokens_per_request = None, target_language="english",
+        self, file_path = None, model = None, system_prompt = None, max_tokens_per_request = None, target_language=None,
         auto_correct = False, auto_improve = False
     ):
         self.file_path = file_path
@@ -113,9 +114,18 @@ class AutoTranslator:
             self.first_line = self.last_line + 1
 
 
+parser = argparse.ArgumentParser()
+
+parser.add_argument("file", help="Path of the file to be translated")
+parser.add_argument("-m", "--model", default="gpt-3.5-turbo", help="GPT model")
+parser.add_argument("-lang", "--target-language", default="english", help="Target language to translate to")
+
+args = parser.parse_args()
+
 translator = AutoTranslator(
-    file_path="Lista 2.tex",
-    model=MODEL,
+    file_path=args.file,
+    model=args.model,
+    target_language=args.target_language,
     system_prompt=SYSTEM_PROMPT,
     max_tokens_per_request=MAX_TOKENS_MODEL
 )
