@@ -11,7 +11,7 @@ OPENAI_API_KEY=xxxxxxx
 
 In order to use the translator, just run
 ```
-python -f path_to_file -m gpt-3.5-turbo
+python main.py -f path_to_file -m gpt-3.5-turbo
 ```
 and the processing will begin. A file with the same name `-translated` will be created in the current directory. 
 
