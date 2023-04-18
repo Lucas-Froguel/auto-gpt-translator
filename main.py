@@ -35,7 +35,7 @@ class AutoTranslator:
         auto_correct = False, auto_improve = False
     ):
         self.file_path = file_path
-        self.translated_file_path = f"{file_path.rsplit('.')[0]}-translated.{file_path.rsplit('.')[1]}"
+        self.translated_file_path = f"{file_path.rsplit('.')[0]}-translated-to-{target_language}.{file_path.rsplit('.')[1]}"
         self.model = model
         self.system_prompt = system_prompt
         self.target_language = target_language
@@ -65,7 +65,7 @@ class AutoTranslator:
         estimated_char_per_line = 80
         # 1 token = 4 char
         self.lines_per_batch = int(
-            self.max_tokens_per_request / (4*estimated_char_per_line)
+            self.max_tokens_per_request / (estimated_char_per_line / 4)
         )
         total_tokens = 4 * estimated_char_per_line * self.number_of_lines
         print(
