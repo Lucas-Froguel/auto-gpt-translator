@@ -5,17 +5,26 @@ import os
 import shutil
 import subprocess
 import sys
+import argparse
 import openai
 import tiktoken
 from termcolor import cprint
 from dotenv import load_dotenv
+from docx import Document
 
 load_dotenv()
 
+parser = argparse.ArgumentParser()
+
+parser.add_argument("file", help="Path of the file to be translated")
+parser.add_argument("-m", "--model", default="gpt-3.5-turbo", help="GPT model")
+parser.add_argument("-lang", "--target-language", default="english", help="Target language to translate to")
+
+args = parser.parse_args()
+
 openai.api_key = os.getenv("OPENAI_API_KEY")
-MODEL = os.getenv("MODEL")
 MAX_TOKENS_MODEL = int(os.getenv("MAX_TOKENS_MODEL"))
-ENCODER = tiktoken.encoding_for_model(MODEL)
+ENCODER = tiktoken.encoding_for_model(args.model)
 
 with open("auto-translator-prompt.txt") as f:
     SYSTEM_PROMPT = f.read()
@@ -23,11 +32,12 @@ with open("auto-translator-prompt.txt") as f:
 
 class AutoTranslator:
     def __init__(
-        self, file_path = None, model = None, system_prompt = None, max_tokens_per_request = None, target_language="english",
+        self, file_path = None, model = None, system_prompt = None, max_tokens_per_request = None, target_language=None,
         auto_correct = False, auto_improve = False
     ):
         self.file_path = file_path
-        self.translated_file_path = f"{file_path.rsplit('.')[0]}-translated.{file_path.rsplit('.')[1]}"
+        self.file_extension = file_path.rsplit('.')[1]
+        self.translated_file_path = f"{file_path.rsplit('.')[0]}-translated-to-{target_language}.{file_path.rsplit('.')[1]}"
         self.model = model
         self.system_prompt = system_prompt
         self.target_language = target_language
@@ -39,6 +49,7 @@ class AutoTranslator:
             - AUTO-IMPROVE: {self.auto_improve}
         """
 
+        self.lines = []
         self.first_line = 0
         self.last_line = 0
         self.number_of_lines = 0
@@ -49,7 +60,13 @@ class AutoTranslator:
         self.raw_text = ""
         self.translated_text = ""
 
+        self.doc = Document()
+
     def get_amount_of_lines_in_file(self):
+        if self.file_extension == "docx":
+            self.number_of_lines = len(self.lines)
+            return
+
         with open(self.file_path, "r") as file:
             self.number_of_lines = sum(1 for _ in file)
 
@@ -57,18 +74,43 @@ class AutoTranslator:
         estimated_char_per_line = 80
         # 1 token = 4 char
         self.lines_per_batch = int(
-            self.max_tokens_per_request / (4*estimated_char_per_line)
+            self.max_tokens_per_request / (estimated_char_per_line / 4)
         )
         total_tokens = 4 * estimated_char_per_line * self.number_of_lines
         print(
             f"Estimated amount of tokens is {total_tokens} and will take {self.number_of_lines / self.lines_per_batch}"
         )
 
-    def write_translated_text(self):
+    def write_translated_text(self, offset):
+        if self.file_extension == "docx":
+            translated_lines = self.translated_text.split('\n')
+            i = 0
+            for p in range(offset, len(self.doc.paragraphs)):
+                paragraph = self.doc.paragraphs[p]
+                for run in paragraph.runs:
+                    if run.text and i + offset < len(translated_lines):
+                        if translated_lines[i + offset].startswith(f"--{i}"):
+                            run.text = translated_lines[i + offset][3:]
+                            i += 1
+
+            self.doc.save(self.translated_file_path)
+            return i
+
+
         with open(f"{self.translated_file_path}", "a+") as translated_file:
             translated_file.write(self.translated_text)
 
     def read_whole_file(self):
+        if self.file_extension == "docx":
+            self.doc = Document(self.file_path)
+            i = 0
+            for p in self.doc.paragraphs:
+                for run in p.runs:
+                    if run.text:
+                        self.lines.append(f"--{i}{run.text}\n")
+                        i += 1
+            return
+
         with open(self.file_path, "r") as file:
             self.lines = file.readlines()
 
@@ -97,9 +139,10 @@ class AutoTranslator:
         # return response['choices'][0]['message']['content']
 
     def translate(self):
+        self.read_whole_file()
         self.get_amount_of_lines_in_file()
         self.calculate_lines_per_batch()
-        self.read_whole_file()
+        offset = 0
         while self.last_line < self.number_of_lines:
             print(f"Processing batch {self.batch}...")
             self.last_line = self.first_line + (self.batch + 1) * self.lines_per_batch
@@ -108,14 +151,16 @@ class AutoTranslator:
 
             self.raw_text = "".join(self.lines[self.first_line:self.last_line])
             self.send_to_gpt()
-            self.write_translated_text()
+            print(repr(self.translated_text))
+            offset = self.write_translated_text(offset)
             self.batch += 1
             self.first_line = self.last_line + 1
 
 
 translator = AutoTranslator(
-    file_path="Lista 2.tex",
-    model=MODEL,
+    file_path=args.file,
+    model=args.model,
+    target_language=args.target_language,
     system_prompt=SYSTEM_PROMPT,
     max_tokens_per_request=MAX_TOKENS_MODEL
 )

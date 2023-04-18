@@ -5,13 +5,15 @@ This code intends to be a universal translator that accepts any file and uses th
 ## How to use
 
 Create a `.env` file and put your OpenAI API key like this:
+
 ```
 OPENAI_API_KEY=xxxxxxx
 ```
 
 In order to use the translator, just run
-```
-python main.py -f path_to_file -m gpt-3.5-turbo
-```
-and the processing will begin. A file with the same name `-translated` will be created in the current directory. 
 
+```
+python main.py path_to_file -m gpt-3.5-turbo -lan english
+```
+
+and the processing will begin. A file with the same name `-translated` will be created in the current directory.
