@@ -13,10 +13,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+parser = argparse.ArgumentParser()
+
+parser.add_argument("file", help="Path of the file to be translated")
+parser.add_argument("-m", "--model", default="gpt-3.5-turbo", help="GPT model")
+parser.add_argument("-lang", "--target-language", default="english", help="Target language to translate to")
+
+args = parser.parse_args()
+
 openai.api_key = os.getenv("OPENAI_API_KEY")
-MODEL = os.getenv("MODEL")
 MAX_TOKENS_MODEL = int(os.getenv("MAX_TOKENS_MODEL"))
-ENCODER = tiktoken.encoding_for_model(MODEL)
+ENCODER = tiktoken.encoding_for_model(args.model)
 
 with open("auto-translator-prompt.txt") as f:
     SYSTEM_PROMPT = f.read()
@@ -113,14 +120,6 @@ class AutoTranslator:
             self.batch += 1
             self.first_line = self.last_line + 1
 
-
-parser = argparse.ArgumentParser()
-
-parser.add_argument("file", help="Path of the file to be translated")
-parser.add_argument("-m", "--model", default="gpt-3.5-turbo", help="GPT model")
-parser.add_argument("-lang", "--target-language", default="english", help="Target language to translate to")
-
-args = parser.parse_args()
 
 translator = AutoTranslator(
     file_path=args.file,
