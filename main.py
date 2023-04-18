@@ -10,6 +10,7 @@ import openai
 import tiktoken
 from termcolor import cprint
 from dotenv import load_dotenv
+from docx import Document
 
 load_dotenv()
 
@@ -35,6 +36,7 @@ class AutoTranslator:
         auto_correct = False, auto_improve = False
     ):
         self.file_path = file_path
+        self.file_extension = file_path.rsplit('.')[1]
         self.translated_file_path = f"{file_path.rsplit('.')[0]}-translated-to-{target_language}.{file_path.rsplit('.')[1]}"
         self.model = model
         self.system_prompt = system_prompt
@@ -47,6 +49,7 @@ class AutoTranslator:
             - AUTO-IMPROVE: {self.auto_improve}
         """
 
+        self.lines = []
         self.first_line = 0
         self.last_line = 0
         self.number_of_lines = 0
@@ -57,7 +60,13 @@ class AutoTranslator:
         self.raw_text = ""
         self.translated_text = ""
 
+        self.doc = Document()
+
     def get_amount_of_lines_in_file(self):
+        if self.file_extension == "docx":
+            self.number_of_lines = len(self.lines)
+            return
+
         with open(self.file_path, "r") as file:
             self.number_of_lines = sum(1 for _ in file)
 
@@ -72,11 +81,36 @@ class AutoTranslator:
             f"Estimated amount of tokens is {total_tokens} and will take {self.number_of_lines / self.lines_per_batch}"
         )
 
-    def write_translated_text(self):
+    def write_translated_text(self, offset):
+        if self.file_extension == "docx":
+            translated_lines = self.translated_text.split('\n')
+            i = 0
+            for p in range(offset, len(self.doc.paragraphs)):
+                paragraph = self.doc.paragraphs[p]
+                for run in paragraph.runs:
+                    if run.text and i + offset < len(translated_lines):
+                        if translated_lines[i + offset].startswith(f"--{i}"):
+                            run.text = translated_lines[i + offset][3:]
+                            i += 1
+
+            self.doc.save(self.translated_file_path)
+            return i
+
+
         with open(f"{self.translated_file_path}", "a+") as translated_file:
             translated_file.write(self.translated_text)
 
     def read_whole_file(self):
+        if self.file_extension == "docx":
+            self.doc = Document(self.file_path)
+            i = 0
+            for p in self.doc.paragraphs:
+                for run in p.runs:
+                    if run.text:
+                        self.lines.append(f"--{i}{run.text}\n")
+                        i += 1
+            return
+
         with open(self.file_path, "r") as file:
             self.lines = file.readlines()
 
@@ -105,9 +139,10 @@ class AutoTranslator:
         # return response['choices'][0]['message']['content']
 
     def translate(self):
+        self.read_whole_file()
         self.get_amount_of_lines_in_file()
         self.calculate_lines_per_batch()
-        self.read_whole_file()
+        offset = 0
         while self.last_line < self.number_of_lines:
             print(f"Processing batch {self.batch}...")
             self.last_line = self.first_line + (self.batch + 1) * self.lines_per_batch
@@ -116,7 +151,8 @@ class AutoTranslator:
 
             self.raw_text = "".join(self.lines[self.first_line:self.last_line])
             self.send_to_gpt()
-            self.write_translated_text()
+            print(repr(self.translated_text))
+            offset = self.write_translated_text(offset)
             self.batch += 1
             self.first_line = self.last_line + 1
 
