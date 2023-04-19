@@ -71,7 +71,7 @@ class AutoTranslator:
             self.number_of_lines = sum(1 for _ in file)
 
     def calculate_lines_per_batch(self):
-        estimated_char_per_line = 80
+        estimated_char_per_line = 1000
         # 1 token = 4 char
         self.lines_per_batch = int(
             self.max_tokens_per_request / (estimated_char_per_line / 4)
@@ -145,13 +145,14 @@ class AutoTranslator:
         offset = 0
         while self.last_line < self.number_of_lines:
             print(f"Processing batch {self.batch}...")
-            self.last_line = self.first_line + (self.batch + 1) * self.lines_per_batch
+            self.last_line = (self.batch + 1) * self.lines_per_batch
             if self.last_line > self.number_of_lines:
                 self.last_line = self.number_of_lines
+            print(f"Sending lines {self.first_line} - {self.last_line}")
 
             self.raw_text = "".join(self.lines[self.first_line:self.last_line])
             self.send_to_gpt()
-            print(repr(self.translated_text))
+            #  print(repr(self.translated_text))
             offset = self.write_translated_text(offset)
             self.batch += 1
             self.first_line = self.last_line + 1
